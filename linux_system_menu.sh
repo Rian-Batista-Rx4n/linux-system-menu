@@ -747,6 +747,7 @@ option_menu() {
             done
             ;;
         6) drivers_menu ;;
+        7) check_required_packages ;;
         9) config_menu ;;
         *) echo "Invalid Input!"; sleep 0.4 ;;
     esac

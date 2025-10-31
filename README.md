@@ -29,7 +29,7 @@ The script automatically detects the **package manager** (pacman, apt, dnf, zypp
 
 ### 1️⃣ Clone the repository
 ```bash
-git clone https://github.com/<seu-usuario>/linux-system-menu.git
+git clone https://github.com/Rian-Batista-Rx4n/linux-system-menu.git
 cd linux-system-menu
 ```
 ### 2️⃣ Grant execute permission

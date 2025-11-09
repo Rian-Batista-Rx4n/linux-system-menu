@@ -2,7 +2,7 @@
 # ================================================
 #  Linux System Menu
 #  Created by: Rx4n
-#  Version: 1.0
+#  Version: 1.1
 # ------------------------------------------------
 # Please perform safe tests and if you have any 
 # problems or suggestions, open an ISSUE or 
@@ -30,15 +30,15 @@ PKG_MAP_COMMON[zypper]="lshw dmidecode smartmontools pciutils lm_sensors"
 
 # AMD GPU
 PKG_MAP_AMD[pacman]="mesa vulkan-radeon xf86-video-amdgpu"
-PKG_MAP_AMD[apt]="mesa-vulkan-drivers mesa-utils"   # Debian/Ubuntu variants exist; ajustar se necessário
-PKG_MAP_AMD[dnf]="mesa-dri-drivers vulkan"          # nomes variam; verificar repositório da distro
-PKG_MAP_AMD[zypper]="Mesa-libGL1 libvulkan1"       # placeholders, ajustar conforme openSUSE repos
+PKG_MAP_AMD[apt]="mesa-vulkan-drivers mesa-utils"
+PKG_MAP_AMD[dnf]="mesa-dri-drivers vulkan"
+PKG_MAP_AMD[zypper]="Mesa-libGL1 libvulkan1"
 
 # NVIDIA GPU
 PKG_MAP_NVIDIA[pacman]="nvidia nvidia-utils lib32-nvidia-utils"
-PKG_MAP_NVIDIA[apt]="nvidia-driver nvidia-utils"   # em Ubuntu, ubuntu-drivers autoinstall pode ser usado
+PKG_MAP_NVIDIA[apt]="nvidia-driver nvidia-utils"
 PKG_MAP_NVIDIA[dnf]="kmod-nvidia xorg-x11-drv-nvidia" 
-PKG_MAP_NVIDIA[zypper]="nvidia-compute-files"      # ajustar conforme repos
+PKG_MAP_NVIDIA[zypper]="nvidia-compute-files"
 
 # INTEL GPU
 PKG_MAP_INTEL[pacman]="mesa vulkan-intel intel-media-driver"
@@ -232,6 +232,10 @@ install_packages() {
     if [ "${#pkgs[@]}" -eq 0 ]; then
         return 0
     fi
+
+    local PKG_MANAGER=$(echo "$linux_package_system" | tr '[:upper:]' '[:lower:]')
+    local pkg_list="${pkgs[*]}"
+
     case "$PKG_MANAGER" in
         pacman)
             sudo pacman -Syu --noconfirm "${pkgs[@]}"
@@ -304,9 +308,11 @@ install_drivers_for_vendor() {
             echo "Vendor desconhecido. Nada a instalar."
             ;;
     esac
+    read -p "Press ENTER to continue..." _
 }
 
 drivers_menu() {
+    clear
     echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo -e "===-----     Linux Driver Installer     -----==="
     echo -e "==-----         Created By: Rx4n         -----=="
@@ -322,7 +328,7 @@ drivers_menu() {
     case "$opt" in
         1)
             vendor=$(detect_gpu_vendor)
-            echo "Detecção: $vendor"
+            echo "Actual detected GPU: $vendor"
             if [ "$vendor" = "UNKNOWN" ]; then
                 echo "The GPU could not be detected automatically."
                 return 0
@@ -351,7 +357,7 @@ drivers_menu() {
     esac
 }
 
-REQUIRED_CMDS=(lshw dmidecode smartctl lspci lsblk sensors)
+REQUIRED_CMDS=(lshw dmidecode smartctl lspci lsblk sensors cpupower)
 
 check_required_packages() {
     local missing=()
@@ -362,63 +368,56 @@ check_required_packages() {
     done
 
     if [ "${#missing[@]}" -eq 0 ]; then
-        echo "All the necessary commands are installed."
+        read -p "All the necessary packages are installed on your current system, press ENTER to continue..." no_packages
         return 0
     fi
 
-    echo "Comandos faltantes: ${missing[*]}"
-    # Map commands to distro packages
+    echo "Packages to install: ${missing[*]}"
     local to_install=()
     for cmd in "${missing[@]}"; do
         case "$cmd" in
             lshw)
-                case "$PKG_MANAGER" in
-                    pacman) to_install+=("lshw");;
-                    apt) to_install+=("lshw");;
-                    dnf) to_install+=("lshw");;
-                    zypper) to_install+=("lshw");;
-                    *) to_install+=("lshw");;
-                esac
-                ;;
+                to_install+=("lshw");;
             dmidecode)
-                to_install+=("dmidecode")
-                ;;
+                to_install+=("dmidecode");;
             smartctl)
-                # package smartmontools provides smartctl in most distros
-                to_install+=("smartmontools")
-                ;;
+                to_install+=("smartmontools");;
             lspci)
-                # pciutils provides lspci
-                to_install+=("pciutils")
-                ;;
+                to_install+=("pciutils");;
             lsblk)
-                # util-linux provides lsblk, usually installed by default
-                to_install+=("util-linux")
-                ;;
+                to_install+=("util-linux");;
             sensors)
-                # lm_sensors / lm-sensors
                 if [ "$PKG_MANAGER" = "pacman" ]; then
                     to_install+=("lm_sensors")
                 else
                     to_install+=("lm-sensors")
                 fi
                 ;;
-            *)
-                to_install+=("$cmd")
+            cpupower)
+                case "$PKG_MANAGER" in
+                    pacman) to_install+=("cpupower");;
+                    apt) to_install+=("linux-tools-common" "linux-tools-generic");;
+                    dnf) to_install+=("kernel-tools");;
+                    zypper) to_install+=("kernel-tools");;
+                    *) to_install+=("cpupower");;
+                esac
                 ;;
+            *)
+                to_install+=("$cmd");;
         esac
     done
 
-    # Remove duplicates
     IFS=$'\n' to_install=($(sort -u <<<"${to_install[*]}"))
     unset IFS
 
-    echo "Pacotes sugeridos para instalação: ${to_install[*]}"
-    read -p "Deseja instalar os pacotes sugeridos agora? [y/N]: " yn2
+    echo "Missing Packages: ${to_install[*]}"
+    read -p "Install Packages Now? [y/N]: " yn2
     if [[ "$yn2" =~ ^[Yy]$ ]]; then
         install_packages "${to_install[@]}"
     fi
+    read -p "Press ENTER to continue..." _
 }
+
 
 # ------------------------------
 # Arch automatic installer
@@ -625,7 +624,7 @@ EOF
     else
         log "Installation finished. Please reboot manually when ready."
     fi
-
+    read -p "Press ENTER to continue..." _
 }
 
 # ------------------------------
@@ -748,7 +747,27 @@ option_menu() {
             ;;
         6) drivers_menu ;;
         7) check_required_packages ;;
-        9) config_menu ;;
+        8) nano ~/.bashrc ;;
+        9)
+            clear
+            echo -e "[{=--- Set Energy ---==}]"
+            echo "[1] - Performance"
+            echo "[2] - Economic"
+            read -p ">> " opt
+            if [ "$opt" = "1" ]; then
+                echo -e "\n"
+                sudo cpupower frequency-set -g performance
+            elif [ "$opt" = "2" ]; then
+                echo -e "\n"
+                sudo cpupower frequency-set -g powersave
+            else
+                echo "Invalid Input!"
+                sleep 0.4
+            fi
+            read -p "Press ENTER to continue..."
+            ;;
+        98) systemctl poweroff ;;
+        99) config_menu ;;
         *) echo "Invalid Input!"; sleep 0.4 ;;
     esac
 }
@@ -797,16 +816,19 @@ menu() {
     echo -e "===-----  Linux System Menu   -----==="
     echo -e "==-----    Created by: Rx4n    -----=="
     echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo -e "[1] Update"
-    echo -e "[2] Linux System Reports"
-    echo -e "[3] Clean System"
-    echo -e "[4] Reboot"
-    echo -e "[5] Arch Installer"
-    echo -e "[6] Install Drivers"
-    echo -e "[7] Show/Install 'Required Packages'"
-    echo -e "[9] Configuration"
+    echo -e "[ 1] Update"
+    echo -e "[ 2] Linux System Reports"
+    echo -e "[ 3] Clean System"
+    echo -e "[ 4] Reboot"
+    echo -e "[ 5] Arch Installer"
+    echo -e "[ 6] Install Drivers"
+    echo -e "[ 7] Show/Install 'Required Packages'"
+    echo -e "[ 8] Alias"
+    echo -e "[ 9] Battery Mode"
+    echo -e "[98] Turn OFF"
+    echo -e "[99] Configuration"
     echo -e ""
-    echo -e "[0] Exit"
+    echo -e "[ 0] Exit"
     echo -e "--------------------------------------"
     read -p ">> " choice
     option_menu "$choice"

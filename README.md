@@ -16,6 +16,9 @@ Developed by **Rx4n**, this project aims to offer a simple and fast interface to
 - Automatically install drivers (AMD, Intel, NVIDIA)
 - Check and install necessary packages
 - Automatically install **Arch Linux**
+- Turn OFF the system
+- Edit the alias file
+- Change Battery mode (Economic/Performance)
 
 ---
 
